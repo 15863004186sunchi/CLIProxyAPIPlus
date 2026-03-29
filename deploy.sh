@@ -37,9 +37,12 @@ mkdir -p "$SOURCE_DIR"
 if [ ! -d "$SOURCE_DIR/.git" ]; then
     echo "首次克隆仓库..."
     git clone "$FORK_REPO" "$SOURCE_DIR"
+    cd "$SOURCE_DIR" && git config core.fileMode false
 else
     echo "提取最新代码..."
-    cd "$SOURCE_DIR" && git pull
+    cd "$SOURCE_DIR"
+    git config core.fileMode false
+    git pull
 fi
 
 echo "正在构建自定义镜像 (包含最新 uTLS/特征伪装) 此步骤可能需要几分钟..."
