@@ -97,8 +97,11 @@ func (t *utlsRoundTripper) getOrCreateConnection(host, addr string) (*http2.Clie
 
 // createConnection creates a new HTTP/2 connection with Chrome TLS fingerprint.
 func (t *utlsRoundTripper) createConnection(host, addr string) (*http2.ClientConn, error) {
+	log.Infof("[evasion] creating new uTLS (Chrome) connection to %s, addr: %s", host, addr)
+
 	conn, err := t.dialer.Dial("tcp", addr)
 	if err != nil {
+		log.Errorf("[evasion] failed to dial %s: %v", addr, err)
 		return nil, err
 	}
 

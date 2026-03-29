@@ -3,6 +3,8 @@ package proxyutil
 import (
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -16,6 +18,9 @@ func ApplyStandardBrowserHeaders(req *http.Request) {
 	if req == nil {
 		return
 	}
+
+	host := strings.ToLower(req.URL.Host)
+	log.Infof("[evasion] applying Chrome 133 identity to request: %s %s", req.Method, host)
 
 	headers := req.Header
 
@@ -54,6 +59,8 @@ func ApplyStandardBrowserHeadersToMap(headers http.Header, targetHost string) {
 	if headers == nil {
 		return
 	}
+
+	log.Infof("[evasion] applying Chrome 133 identity to header map for host: %s", targetHost)
 
 	headers.Set("User-Agent", ChromeUserAgent)
 	headers.Set("Accept", "application/json, text/plain, */*")

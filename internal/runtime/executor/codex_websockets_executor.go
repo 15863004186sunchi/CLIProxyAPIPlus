@@ -651,8 +651,14 @@ func (e *CodexWebsocketsExecutor) dialCodexWebsocket(ctx context.Context, auth *
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	log.Infof("[codex-ws] starting websocket handshake with %s", uWSURL)
 	conn, resp, err := dialer.DialContext(ctx, uWSURL, headers)
+	if err != nil {
+		log.Errorf("[codex-ws] websocket handshake failed: %v", err)
+		return nil, nil, err
+	}
 	if conn != nil {
+		log.Infof("[codex-ws] websocket handshake successful, status: %s", resp.Status)
 		conn.EnableWriteCompression(false)
 	}
 	return conn, resp, err
