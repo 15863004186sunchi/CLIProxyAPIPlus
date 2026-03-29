@@ -99,6 +99,7 @@ func (o *CodexAuth) ExchangeCodeForTokensWithRedirect(ctx context.Context, code,
 		return nil, fmt.Errorf("failed to create token request: %w", err)
 	}
 
+	proxyutil.ApplyStandardBrowserHeaders(req)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
@@ -185,6 +186,7 @@ func (o *CodexAuth) RefreshTokens(ctx context.Context, refreshToken string) (*Co
 		return nil, fmt.Errorf("failed to create refresh request: %w", err)
 	}
 
+	proxyutil.ApplyStandardBrowserHeaders(req)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 

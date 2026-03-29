@@ -49,6 +49,10 @@ func (e *CodexExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Aut
 	if req == nil {
 		return nil
 	}
+
+	// Apply identity first so it can be overridden by custom headers if needed
+	proxyutil.ApplyStandardBrowserHeaders(req)
+
 	apiKey, _ := codexCreds(auth)
 	if strings.TrimSpace(apiKey) != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
