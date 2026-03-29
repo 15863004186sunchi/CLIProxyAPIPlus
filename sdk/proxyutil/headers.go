@@ -40,7 +40,6 @@ func ApplyStandardBrowserHeaders(req *http.Request) {
 	headers.Set("Sec-Fetch-Site", "same-site")
 
 	// Origin/Referer Logic
-	host := strings.ToLower(req.URL.Host)
 	if strings.Contains(host, "openai.com") || strings.Contains(host, "chatgpt.com") {
 		headers.Set("Origin", "https://chatgpt.com")
 		if headers.Get("Referer") == "" {
