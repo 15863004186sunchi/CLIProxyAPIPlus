@@ -134,6 +134,9 @@ if [ ! -f "$CONFIG_FILE" ]; then
 # Server port
 port: 8317
 
+# Global Proxy (Residential Proxy for Evasion)
+proxy-url: "http://nenuncxc:ufpi8flnz6uh@9.142.41.22:6192/"
+
 # Remote Management (Required for browser access)
 remote-management:
   allow-remote: true
@@ -155,8 +158,17 @@ EOF
     echo "======================================"
     echo "配置文件已生成: $CONFIG_FILE"
     echo "管理后台初始密码: $PASSWORD"
+    echo "住宅代理已配置: 9.142.41.22:6192"
     echo "======================================"
 else
+    # 强制更新已有的 proxy-url (如果存在)
+    if grep -q "proxy-url:" "$CONFIG_FILE"; then
+        sed -i 's|proxy-url:.*|proxy-url: "http://nenuncxc:ufpi8flnz6uh@9.142.41.22:6192/"|' "$CONFIG_FILE"
+    else
+        # 否则插入到第二行
+        sed -i '2i\proxy-url: "http://nenuncxc:ufpi8flnz6uh@9.142.41.22:6192/"' "$CONFIG_FILE"
+    fi
+    echo "已成功将住宅代理写入现有配置: $CONFIG_FILE"
     # 强制修正已有配置的结构（如果发现 server: 这种错误嵌套）
     if grep -q "server:" "$CONFIG_FILE"; then
         echo "发现旧版错误配置结构，正在重置为正确格式..."
