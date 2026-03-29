@@ -3,9 +3,6 @@
 package proxyutil
 
 import (
-	"context"
-	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
