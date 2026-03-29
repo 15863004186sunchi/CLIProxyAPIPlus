@@ -16,6 +16,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
+	"github.com/router-for-me/CLIProxyAPI/v6/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ type CodexAuth struct {
 // It initializes an HTTP client with proxy settings from the provided configuration.
 func NewCodexAuth(cfg *config.Config) *CodexAuth {
 	return &CodexAuth{
-		httpClient: util.SetProxy(&cfg.SDKConfig, &http.Client{}),
+		httpClient: proxyutil.NewUtlsHttpClient(&cfg.SDKConfig),
 	}
 }
 

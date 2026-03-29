@@ -116,3 +116,21 @@ func buildProxyTransport(proxyURL string) *http.Transport {
 	}
 	return transport
 }
+
+// newUtlsProxyAwareHTTPClient creates an HTTP client with uTLS (Chrome) fingerprint
+// to bypass TLS fingerprinting.
+func newUtlsProxyAwareHTTPClient(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth, timeout time.Duration) *http.Client {
+	sdkCfg := &config.SDKConfig{}
+	if cfg != nil {
+		*sdkCfg = cfg.SDKConfig
+	}
+	if auth != nil && strings.TrimSpace(auth.ProxyURL) != "" {
+		sdkCfg.ProxyURL = auth.ProxyURL
+	}
+
+	httpClient := proxyutil.NewUtlsHttpClient(sdkCfg)
+	if timeout > 0 {
+		httpClient.Timeout = timeout
+	}
+	return httpClient
+}

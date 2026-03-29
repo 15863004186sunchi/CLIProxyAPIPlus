@@ -1,22 +1,25 @@
-// Package claude provides authentication functionality for Anthropic's Claude API.
+// Package proxyutil provides utility functions for working with proxies and networking.
 // This file implements a custom HTTP transport using utls to bypass TLS fingerprinting.
-package claude
+package proxyutil
 
 import (
+	"context"
+	"crypto/tls"
+	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
 
-	tls "github.com/refraction-networking/utls"
+	utls "github.com/refraction-networking/utls"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
-	"github.com/router-for-me/CLIProxyAPI/v6/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/proxy"
 )
 
 // utlsRoundTripper implements http.RoundTripper using utls with Chrome fingerprint
-// to bypass Cloudflare's TLS fingerprinting on Anthropic domains.
+// to bypass TLS fingerprinting on AI service domains.
 type utlsRoundTripper struct {
 	// mu protects the connections map and pending map
 	mu sync.Mutex
@@ -28,14 +31,14 @@ type utlsRoundTripper struct {
 	dialer proxy.Dialer
 }
 
-// newUtlsRoundTripper creates a new utls-based round tripper with optional proxy support
-func newUtlsRoundTripper(cfg *config.SDKConfig) *utlsRoundTripper {
+// NewUtlsRoundTripper creates a new utls-based round tripper with optional proxy support
+func NewUtlsRoundTripper(cfg *config.SDKConfig) http.RoundTripper {
 	var dialer proxy.Dialer = proxy.Direct
 	if cfg != nil {
-		proxyDialer, mode, errBuild := proxyutil.BuildDialer(cfg.ProxyURL)
+		proxyDialer, mode, errBuild := BuildDialer(cfg.ProxyURL)
 		if errBuild != nil {
 			log.Errorf("failed to configure proxy dialer for %q: %v", cfg.ProxyURL, errBuild)
-		} else if mode != proxyutil.ModeInherit && proxyDialer != nil {
+		} else if mode != ModeInherit && proxyDialer != nil {
 			dialer = proxyDialer
 		}
 	}
@@ -96,27 +99,25 @@ func (t *utlsRoundTripper) getOrCreateConnection(host, addr string) (*http2.Clie
 }
 
 // createConnection creates a new HTTP/2 connection with Chrome TLS fingerprint.
-// Chrome's TLS fingerprint is closer to Node.js/OpenSSL (which real Claude Code uses)
-// than Firefox, reducing the mismatch between TLS layer and HTTP headers.
 func (t *utlsRoundTripper) createConnection(host, addr string) (*http2.ClientConn, error) {
 	conn, err := t.dialer.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsConfig := &tls.Config{ServerName: host}
-	tlsConn := tls.UClient(conn, tlsConfig, tls.HelloChrome_Auto)
+	tlsConfig := &utls.Config{ServerName: host}
+	tlsConn := utls.UClient(conn, tlsConfig, utls.HelloChrome_Auto)
 
-	if err := tlsConn.Handshake(); err != nil {
+	if errHandshake := tlsConn.Handshake(); errHandshake != nil {
 		conn.Close()
-		return nil, err
+		return nil, errHandshake
 	}
 
 	tr := &http2.Transport{}
-	h2Conn, err := tr.NewClientConn(tlsConn)
-	if err != nil {
+	h2Conn, errH2 := tr.NewClientConn(tlsConn)
+	if errH2 != nil {
 		tlsConn.Close()
-		return nil, err
+		return nil, errH2
 	}
 
 	return h2Conn, nil
@@ -138,25 +139,43 @@ func (t *utlsRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, err
 	}
 
-	resp, err := h2Conn.RoundTrip(req)
-	if err != nil {
+	resp, errRoundTrip := h2Conn.RoundTrip(req)
+	if errRoundTrip != nil {
 		// Connection failed, remove it from cache
 		t.mu.Lock()
 		if cached, ok := t.connections[hostname]; ok && cached == h2Conn {
 			delete(t.connections, hostname)
 		}
 		t.mu.Unlock()
-		return nil, err
+		return nil, errRoundTrip
 	}
 
 	return resp, nil
 }
 
-// NewAnthropicHttpClient creates an HTTP client that bypasses TLS fingerprinting
-// for Anthropic domains by using utls with Chrome fingerprint.
-// It accepts optional SDK configuration for proxy settings.
-func NewAnthropicHttpClient(cfg *config.SDKConfig) *http.Client {
+// NewUtlsHttpClient creates an HTTP client that bypasses TLS fingerprinting.
+func NewUtlsHttpClient(cfg *config.SDKConfig) *http.Client {
 	return &http.Client{
-		Transport: newUtlsRoundTripper(cfg),
+		Transport: NewUtlsRoundTripper(cfg),
+	}
+}
+
+// UtlsDialer provides a websocket dialer that uses utls for TLS fingerprinting.
+func UtlsDialer(parent proxy.Dialer, host string) func(network, addr string) (net.Conn, error) {
+	return func(network, addr string) (net.Conn, error) {
+		conn, err := parent.Dial(network, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig := &utls.Config{ServerName: host}
+		tlsConn := utls.UClient(conn, tlsConfig, utls.HelloChrome_Auto)
+
+		if errH := tlsConn.Handshake(); errH != nil {
+			conn.Close()
+			return nil, errH
+		}
+
+		return tlsConn, nil
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -59,10 +60,10 @@ type ClaudeAuth struct {
 // Returns:
 //   - *ClaudeAuth: A new Claude authentication service instance
 func NewClaudeAuth(cfg *config.Config) *ClaudeAuth {
-	// Use custom HTTP client with Firefox TLS fingerprint to bypass
+	// Use custom HTTP client with Chrome TLS fingerprint to bypass
 	// Cloudflare's bot detection on Anthropic domains
 	return &ClaudeAuth{
-		httpClient: NewAnthropicHttpClient(&cfg.SDKConfig),
+		httpClient: proxyutil.NewUtlsHttpClient(&cfg.SDKConfig),
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/proxy"
 )
 
@@ -609,16 +610,49 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *clipr
 }
 
 func (e *CodexWebsocketsExecutor) dialCodexWebsocket(ctx context.Context, auth *cliproxyauth.Auth, wsURL string, headers http.Header) (*websocket.Conn, *http.Response, error) {
+	isTLS := strings.HasPrefix(strings.ToLower(wsURL), "wss://")
+	uWSURL := wsURL
+	if isTLS {
+		uWSURL = "ws" + wsURL[3:]
+	}
+
+	parsedURL, _ := url.Parse(wsURL)
+	host := parsedURL.Hostname()
+
 	dialer := newProxyAwareWebsocketDialer(e.cfg, auth)
 	dialer.HandshakeTimeout = codexResponsesWebsocketHandshakeTO
 	dialer.EnableCompression = true
+
+	// Wrap NetDialContext to perform uTLS handshake
+	originalNetDial := dialer.NetDialContext
+	dialer.NetDialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		var conn net.Conn
+		var err error
+		if originalNetDial != nil {
+			conn, err = originalNetDial(ctx, network, addr)
+		} else {
+			conn, err = (&net.Dialer{}).DialContext(ctx, network, addr)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		if isTLS {
+			uConn := utls.UClient(conn, &utls.Config{ServerName: host}, utls.HelloChrome_Auto)
+			if errHandshake := uConn.Handshake(); errHandshake != nil {
+				conn.Close()
+				return nil, errHandshake
+			}
+			return uConn, nil
+		}
+		return conn, nil
+	}
+
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	conn, resp, err := dialer.DialContext(ctx, wsURL, headers)
+	conn, resp, err := dialer.DialContext(ctx, uWSURL, headers)
 	if conn != nil {
-		// Avoid gorilla/websocket flate tail validation issues on some upstreams/Go versions.
-		// Negotiating permessage-deflate is fine; we just don't compress outbound messages.
 		conn.EnableWriteCompression(false)
 	}
 	return conn, resp, err
